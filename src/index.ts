@@ -101,50 +101,59 @@ try {
         let id = 0;
 
         wss.on('connection', function connection(ws) {
-            const socket = new WebSocket(e);
             const socketID = "@" + id++;
-            socket.addEventListener("error", (e) => {
-                log(socketID, "on error :", e.message)
-                ws.close(4000, `The proxy can't reach the endpoint ${e.message}.`);
-            })
+            log(socketID, "forward connection");
+            let socket: WebSocket;
+            try {
+                socket = new WebSocket(e, {
+                    rejectUnauthorized: false,
+                });
 
-            ws.on('message', (data) => {
-                log(socketID, "forward message :", data.toString("utf-8"))
-                socket.send(data.toString("utf-8"));
-            });
+                socket.addEventListener("error", (e) => {
+                    log(socketID, "on error :", e.message)
+                    ws.close(4000, `The proxy can't reach the endpoint ${e.message}.`);
+                })
 
-            ws.on('close', (code, reason) => {
-                log(socketID, "forward close :", code, ":", reason.toString("utf-8"))
-                try {
-                    socket.close();
-                } catch (e: any) {
-                    log(`ERROR: socket closed with an error ${id} : ${e}`)
-                }
-            });
+                ws.on('message', (data) => {
+                    log(socketID, "forward message :", data.toString("utf-8"))
+                    socket.send(data.toString("utf-8"));
+                });
 
-            ws.on('error', (args) => {
-                log(socketID, "on error :", args)
-            });
+                ws.on('close', (code, reason) => {
+                    log(socketID, "forward close :", code, ":", reason.toString("utf-8"))
+                    try {
+                        socket.close();
+                    } catch (e) {
+                        log(`ERROR: socket closed with an error ${id} : ${e}`)
+                    }
+                });
 
-            ws.on('ping', (data) => {
-                log(socketID, "forward ping :", data.toString("utf-8"))
-                socket.ping(data.toString("utf-8"));
-            })
+                ws.on('error', (args) => {
+                    log(socketID, "on error :", args)
+                });
 
-            ws.on('pong', (data) => {
-                log(socketID, "forward pong :", data.toString("utf-8"))
-                socket.pong(data.toString("utf-8"));
-            })
+                ws.on('ping', (data) => {
+                    log(socketID, "forward ping :", data.toString("utf-8"))
+                    socket.ping(data.toString("utf-8"));
+                })
 
-            ws.on('unexpected-response', (req, res) => {
-                log(socketID, "on error (unexpected-response):", req, res)
-                console.error("ERROR (unexpected-response):", req, res);
-            })
+                ws.on('pong', (data) => {
+                    log(socketID, "forward pong :", data.toString("utf-8"))
+                    socket.pong(data.toString("utf-8"));
+                })
 
-            ws.on("upgrade", (req) => {
-                log(socketID, "forward upgrade", req)
-                socket.send(req);
-            })
+                ws.on('unexpected-response', (req, res) => {
+                    log(socketID, "on error (unexpected-response):", req, res)
+                    console.error("ERROR (unexpected-response):", req, res);
+                })
+
+                ws.on("upgrade", (req) => {
+                    log(socketID, "forward upgrade", req)
+                    socket.send(req);
+                })
+            } catch (error) {
+                log(socketID, "ERROR: error on forwarding connection", error)
+            }
         });
 
         server.listen(p, () => {
@@ -171,17 +180,13 @@ try {
                 "-days",
                 "365",
                 "-subj",
-                "/C=aa/ST=aa/L=aa/O=aa/OU=aa/CN=aa"
+                "/C=IO/ST=none/L=none/O=none/OU=none/CN=localhost"
             ], {
                 "stdio": "pipe"
             });
+            log(cmd.stdout.toString("utf-8"));
+            log(cmd.stderr.toString("utf-8"));
 
-            try {
-                log(cmd.stdout.toString("utf-8"));
-                log(cmd.stderr.toString("utf-8"));
-            } catch (e) {
-                console.log(cmd, e)
-            }
         } else {
             log("start certificate generation...")
             ChildProcess.spawnSync("openssl", [
@@ -196,7 +201,7 @@ try {
                 "-days",
                 "365",
                 "-subj",
-                "/C=aa/ST=aa/L=aa/O=aa/OU=aa/CN=aa"
+                "/C=IO/ST=none/L=none/O=none/OU=none/CN=localhost"
             ], {
                 "stdio": "pipe"
             });
