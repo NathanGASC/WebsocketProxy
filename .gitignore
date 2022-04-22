@@ -1,0 +1,6 @@
+dist
+exe
+cert.pem
+key.pem
+log.txt
+node_modules
