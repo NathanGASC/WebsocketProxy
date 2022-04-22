@@ -1,5 +1,6 @@
 import path from 'path';
-import { createServer } from 'https';
+import https from 'https';
+import http from 'http';
 import { readFileSync } from 'fs';
 import { WebSocket, WebSocketServer } from 'ws';
 import ChildProcess, { execSync } from "child_process";
@@ -83,19 +84,32 @@ try {
             }
         }
 
-        conf = {}
+        let server;
+        let json = {
+            args: {
+                "--endpoint": e,
+                "--port": p,
+                "--secure": s,
+                "--tunnel": t
+            },
+            tunnel: t ? tunnel!.url : null,
+        }
         if (s) {
             conf = {
                 cert: readFileSync(certPath),
                 key: readFileSync(keyPath),
             };
+            server = https.createServer(conf, (req, res) => {
+                if (req.method == "GET")
+                    res.end(JSON.stringify(json));
+            });
+        } else {
+            conf = {};
+            server = http.createServer(conf, (req, res) => {
+                if (req.method == "GET")
+                    res.end(JSON.stringify(json));
+            });
         }
-
-        const server = createServer(conf, (req, res) => {
-            if (req.method == "GET") {
-                res.end(JSON.stringify({ tunnel: tunnel.url }));
-            }
-        });
 
         const wss = new WebSocketServer({ server });
         let id = 0;
