@@ -5,20 +5,24 @@ import { WebSocket, WebSocketServer } from 'ws';
 import ChildProcess, { execSync } from "child_process";
 import fs from "fs";
 import fse from 'fs-extra';
+import localtunnel from "localtunnel"
 
 /**
  * -e --endpoint : the url which will receive all forward socket (default: ws://localhost:8081)
  * -p --port : the port of the proxy server (default: 8080)
  * -s --secure : generate autosigned certificate to run the server on wss instead of ws
+ * -t --tunnel : open the server proxy to internet
  */
 let e = "ws://localhost:8081";
 let p = "8080";
 let s = false;
+let t = false;
 
 const opensslPathVirtual = path.join(__dirname, "/../OpenSSL-Win64/bin/openssl.exe");
 const opensslPathVirtualFullDirectory = path.join(__dirname, "/../OpenSSL-Win64");
 const opensslPathReal = path.join(process.cwd(), "/OpenSSL-Win64/bin/openssl.exe");
 const opensslPathRealFullDirectory = path.join(process.cwd(), "/OpenSSL-Win64");
+
 const logPath = path.join(process.cwd(), "./log.txt");
 const certPath = path.join(process.cwd(), './cert.pem');
 const keyPath = path.join(process.cwd(), './key.pem');
@@ -37,18 +41,24 @@ try {
             case "--secure":
                 s = true;
                 break;
+            case "-t":
+            case "--tunnel":
+                t = true;
+                break;
             default:
                 break;
         }
     })
 
     //if don't exist, it's mean we are in pkg exe file
-    if (!fs.existsSync(opensslPathReal) && s) {
-        log("Create openssl folder")
-        try {
-            fse.copySync(opensslPathVirtualFullDirectory, opensslPathRealFullDirectory, { overwrite: true });
-        } catch (e) {
-            log("ERROR: error on openssl folder creation", e);
+    if (!fs.existsSync(opensslPathReal)) {
+        if (s) {
+            log("Create openssl folder")
+            try {
+                fse.copySync(opensslPathVirtualFullDirectory, opensslPathRealFullDirectory, { overwrite: true });
+            } catch (e) {
+                log("ERROR: error on openssl folder creation", e);
+            }
         }
     }
 
@@ -59,13 +69,33 @@ try {
 
     async function start() {
         let conf = {}
+
+        let tunnel: localtunnel.Tunnel;
+        if (t) {
+            try {
+                tunnel = await localtunnel(parseInt(p), {
+                    local_https: s ? true : false,
+                    allow_invalid_cert: true
+                });
+                log("tunnel open on", tunnel.url);
+            } catch (e) {
+                log("ERROR: (localtunnel) can't create tunnel");
+            }
+        }
+
+        conf = {}
         if (s) {
             conf = {
                 cert: readFileSync(certPath),
                 key: readFileSync(keyPath),
             };
         }
-        const server = createServer(conf);
+
+        const server = createServer(conf, (req, res) => {
+            if (req.method == "GET") {
+                res.end(JSON.stringify({ tunnel: tunnel.url }));
+            }
+        });
 
         const wss = new WebSocketServer({ server });
         let id = 0;
@@ -75,7 +105,7 @@ try {
             const socketID = "@" + id++;
             socket.addEventListener("error", (e) => {
                 log(socketID, "on error :", e.message)
-                ws.close(4000, `The proxy can't reach the endpoint ${e}.`);
+                ws.close(4000, `The proxy can't reach the endpoint ${e.message}.`);
             })
 
             ws.on('message', (data) => {
@@ -87,7 +117,7 @@ try {
                 log(socketID, "forward close :", code, ":", reason.toString("utf-8"))
                 try {
                     socket.close();
-                } catch (e) {
+                } catch (e: any) {
                     log(`ERROR: socket closed with an error ${id} : ${e}`)
                 }
             });
