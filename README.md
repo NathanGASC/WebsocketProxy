@@ -5,7 +5,7 @@ Is a server which handle and proxy websockets to a given endpoint.
 Download the latest release for your OS from github and launch the executable file.
 
 ### Arguments
-You can run the executable with arguments using bash/terminal. To do so execute `websocketproxy-win.exe -s --port 8085 --e wss://localhost:8081`
+You can run the executable with arguments using bash/terminal. To do so execute `websocketproxy-win.exe -s --port 8085 -e wss://localhost:8081`
 ```
 -e --endpoint : the url which will receive all forward socket (default: ws://localhost:8081)
 -p --port : the port of the proxy server (default: 8080)
