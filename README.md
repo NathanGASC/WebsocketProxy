@@ -1,5 +1,5 @@
 # Websocket proxy
-Is a server which handle et proxy websockets to a given endpoint.
+Is a server which handle and proxy websockets to a given endpoint.
 
 ## How to use
 Download the latest release for your OS from github and launch the executable file.
